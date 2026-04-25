@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/sort_added"
+        android:title="Sortuj wg daty dodania"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/sort_expiry"
+        android:title="Sortuj wg daty ważności"
+        app:showAsAction="never" />
+</menu>
