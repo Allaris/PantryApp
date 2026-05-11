@@ -10,6 +10,8 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
+
+
 import com.google.ai.client.generativeai.GenerativeModel;
 import com.google.ai.client.generativeai.java.GenerativeModelFutures;
 import com.google.ai.client.generativeai.type.Content;
@@ -47,7 +49,7 @@ public class RecipeActivity extends AppCompatActivity {
         markwon = Markwon.create(this);
 
         // Konfiguracja modelu Gemini  gemini-2.5-flash-lite ,gemini-2.5-flash ,gemini-2.0-flash
-        GenerativeModel gm = new GenerativeModel("gemini-2.5-flash-lite", "AIzaSyCvXTBWiuYDHsJWRtT0oJ7YOG4VyWUQaEk"); //kluzc z https://aistudio.google.com/api-keys
+        GenerativeModel gm = new GenerativeModel("gemini-2.5-flash-lite", BuildConfig.GEMINI_API_KEY); //kluzc z https://aistudio.google.com/api-keys w local properties
         modelFutures = GenerativeModelFutures.from(gm);
 
         String prompt = getIntent().getStringExtra("PROMPT");
