@@ -1,21 +1,25 @@
 package io.github.allaris.pantry;
 
-import android.app.DatePickerDialog;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.view.Menu;
-import android.view.MenuItem;
+import android.view.View;
 import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -24,132 +28,189 @@ public class MainActivity extends AppCompatActivity {
 
     private PantryAdapter adapter;
     private List<PantryItem> pantryList;
-    private boolean sortExpiry = false; // Zapamiętuje aktualny wybór sortowania
+    private boolean sortExpiry = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Znajduje DOLNY pasek
-        com.google.android.material.bottomappbar.BottomAppBar bottomAppBar = findViewById(R.id.bottomAppBar);
-        setSupportActionBar(bottomAppBar); // 3 kropki na dole lewo
-        // W MainActivity.java pod setSupportActionBar(bottomAppBar);
-        bottomAppBar.setTitle(""); // Usuwa domyślny tytuł, aby TextView na środku miał miejsce
-        bottomAppBar.setOverflowIcon(androidx.core.content.ContextCompat.getDrawable(this, android.R.drawable.ic_menu_more));
-
-
-        // WCZYTYWANIE DANYCH
+        // 1. ŁADOWANIE DANYCH (Najpierw dane, potem widoki)
         loadDataFromPhone();
-        sortList(); // Sortuj domyślnie po wczytaniu
 
-        // KONFIGURACJA LISTY
+        // 2. WIDOKI I TOOLBAR
+        com.google.android.material.bottomappbar.BottomAppBar bottomAppBar = findViewById(R.id.bottomAppBar);
+        bottomAppBar.setTitle("");
+
+        // 3. SORTOWANIE (ImageButton w XML)
+        ImageButton btnSort = findViewById(R.id.btnSort);
+        btnSort.setOnClickListener(v -> {
+            androidx.appcompat.widget.PopupMenu popupMenu = new androidx.appcompat.widget.PopupMenu(this, v);
+            popupMenu.getMenuInflater().inflate(R.menu.main_menu, popupMenu.getMenu());
+            popupMenu.setOnMenuItemClickListener(item -> {
+                if (item.getItemId() == R.id.sort_added) {
+                    sortExpiry = false;
+                } else if (item.getItemId() == R.id.sort_expiry) {
+                    sortExpiry = true;
+                }
+                sortList(); // Odświeża i filtruje
+                return true;
+            });
+            popupMenu.show();
+        });
+
+        // 4. WYSZUKIWARKA (Tylko jeden TextWatcher!)
+        EditText searchField = findViewById(R.id.searchField);
+        searchField.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void afterTextChanged(android.text.Editable s) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                filterList(s.toString());
+            }
+        });
+
+        // 5. KONFIGURACJA LISTY
         RecyclerView recyclerView = findViewById(R.id.recyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new PantryAdapter(pantryList);
         recyclerView.setAdapter(adapter);
 
-        // PRZYCISK DODAWANIA
-        FloatingActionButton fab = findViewById(R.id.fabAdd);
-        fab.setOnClickListener(v -> showAddItemDialog());
+        // Domyślne sortowanie na starcie
+        sortList();
 
-        // USUWANIE
-        new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
-            @Override
-            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
-                return false;
+        // 6. PRZYCISKI (Add / AI)
+        findViewById(R.id.fabAdd).setOnClickListener(v -> showAddItemDialog());
+
+        findViewById(R.id.btnAskAi).setOnClickListener(v -> {
+            StringBuilder selectedItems = new StringBuilder();
+            for (PantryItem item : pantryList) {
+                if (item.isSelected()) selectedItems.append(item.getName()).append(", ");
+            }
+            String prompt;
+            if (selectedItems.length() == 0) {
+                prompt = "Zaproponuj 3 szybkie dania z podstawowych produktów.";
+            } else {
+                prompt = "Zrób mi danie z: " + selectedItems + ". Podaj przepis i listę zakupów.";
             }
 
+            Intent intent = new Intent(this, RecipeActivity.class);
+            intent.putExtra("PROMPT", prompt);
+            intent.putExtra("HIDE_RETRY", false); // Tutaj chcemy widzieć przycisk
+            startActivity(intent);
+        });
+
+        // 7. USUWANIE (Swipe)
+        new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
+            @Override public boolean onMove(@NonNull RecyclerView r, @NonNull RecyclerView.ViewHolder v, @NonNull RecyclerView.ViewHolder t) {return false;}
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
                 int position = viewHolder.getAdapterPosition();
+                // Ważne: musimy usuwać z głównej listy, nie tylko z widoku!
                 pantryList.remove(position);
-                adapter.notifyItemRemoved(position);
-                saveDataToPhone(); // Zapisujemy po usunięciu
+                saveDataToPhone();
+                sortList(); // Odśwież widok po usunięciu
             }
         }).attachToRecyclerView(recyclerView);
     }
 
-    // MENU (TRZY KROPKI)
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.main_menu, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        if (item.getItemId() == R.id.sort_added) {
-            sortExpiry = false;
-            sortList();
-            return true;
-        } else if (item.getItemId() == R.id.sort_expiry) {
-            sortExpiry = true;
-            sortList();
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
-    }
-
-    // LOGIKA DODAWANIA
-    private void showAddItemDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Nazwa produktu");
-        final EditText input = new EditText(this);
-        builder.setView(input);
-
-        builder.setPositiveButton("Dalej", (dialog, which) -> {
-            String name = input.getText().toString();
-            if (!name.isEmpty()) openDatePicker(name);
-        });
-        builder.show();
-    }
-
-    private void openDatePicker(String productName) {
-        LocalDate now = LocalDate.now();
-        new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
-            // Data ważności (wybrana z kalendarza)
-            LocalDate selectedExpiry = LocalDate.of(year, month + 1, dayOfMonth);
-
-            // Data dodania (AUTOMATYCZNA z godziną)
-            LocalDateTime currentDateTime = LocalDateTime.now();
-
-            // Dodanie do listy
-            pantryList.add(new PantryItem(productName, currentDateTime, selectedExpiry));
-
-            sortList();
-            saveDataToPhone();
-        }, now.getYear(), now.getMonthValue() - 1, now.getDayOfMonth()).show();
-    }
-
-    // SORTOWANIE
-    private void sortList() {
+    private void filterList(String text) {
         if (pantryList == null) return;
 
+        // Najpierw układamy główną listę
         if (sortExpiry) {
-            // Sortuj wg daty ważności (najbliższa na górze)
-            pantryList.sort((i1, i2) -> i1.getExpiryDate().compareTo(i2.getExpiryDate()));
+            pantryList.sort(Comparator.comparing(PantryItem::getExpiryDate));
         } else {
-            // Sortuj wg daty dodania (najnowsze na górze)
             pantryList.sort((i1, i2) -> i2.getAddedDate().compareTo(i1.getAddedDate()));
         }
 
-        if (adapter != null) adapter.notifyDataSetChanged();
+        String query = text.toLowerCase().trim();
+        if (query.isEmpty()) {
+            adapter.updateList(new ArrayList<>(pantryList));
+            return;
+        }
+
+        List<PantryItem> filteredList = new ArrayList<>();
+        for (PantryItem item : pantryList) {
+            if (item.getName().toLowerCase().contains(query)) {
+                filteredList.add(item);
+            }
+        }
+        adapter.updateList(filteredList);
     }
 
-    // ZAPIS I ODCZYT
+    private void sortList() {
+        EditText searchField = findViewById(R.id.searchField);
+        filterList(searchField.getText().toString());
+    }
+
+    private void showAddItemDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Dodaj nowy produkt");
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+
+        // 1. Nazwa
+        final EditText inputName = new EditText(this);
+        inputName.setHint("Nazwa produktu");
+        layout.addView(inputName);
+
+        // 2. Ilość
+        final EditText inputCount = new EditText(this);
+        inputCount.setHint("Ilość");
+        inputCount.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        layout.addView(inputCount);
+
+        // 3. Etykieta
+        android.widget.TextView label = new android.widget.TextView(this);
+        label.setText("\nData ważności:");
+        layout.addView(label);
+
+        // 4. DatePicker ze stylem Spinnera
+        // Używamy ContextThemeWrapper, aby wymusić styl spinnera
+        android.view.ContextThemeWrapper contextThemeWrapper = new android.view.ContextThemeWrapper(this, R.style.MyDatePickerSpinner);
+        final android.widget.DatePicker datePicker = new android.widget.DatePicker(contextThemeWrapper);
+
+        layout.addView(datePicker);
+
+        android.widget.ScrollView scrollView = new android.widget.ScrollView(this);
+        scrollView.addView(layout);
+        builder.setView(scrollView);
+
+        builder.setPositiveButton("Dodaj", (dialog, which) -> {
+            String name = inputName.getText().toString().trim();
+            int count = 1;
+            try {
+                String c = inputCount.getText().toString();
+                if (!c.isEmpty()) count = Integer.parseInt(c);
+            } catch (Exception e) { count = 1; }
+
+            if (!name.isEmpty()) {
+                LocalDate expiry = LocalDate.of(datePicker.getYear(), datePicker.getMonth() + 1, datePicker.getDayOfMonth());
+                LocalDateTime now = LocalDateTime.now();
+
+                for (int i = 0; i < count; i++) {
+                    pantryList.add(new PantryItem(name, now, expiry));
+                }
+                sortList();
+                saveDataToPhone();
+            }
+        });
+
+        builder.setNegativeButton("Anuluj", null);
+        builder.show();
+    }
+
     private void saveDataToPhone() {
         SharedPreferences pref = getSharedPreferences("MojaSpiżarnia", MODE_PRIVATE);
-        SharedPreferences.Editor editor = pref.edit();
         HashSet<String> set = new HashSet<>();
         for (PantryItem item : pantryList) {
-            String row = item.getName() + ";" + item.getAddedDate().toString() + ";" + item.getExpiryDate().toString();
-            set.add(row);
+            set.add(item.getName() + ";" + item.getAddedDate().toString() + ";" + item.getExpiryDate().toString());
         }
-        editor.remove("lista_produktow");
-        editor.apply();
-        editor.putStringSet("lista_produktow", set);
-        editor.apply();
+        pref.edit().remove("lista_produktow").apply();
+        pref.edit().putStringSet("lista_produktow", set).apply();
     }
 
     private void loadDataFromPhone() {
@@ -159,23 +220,25 @@ public class MainActivity extends AppCompatActivity {
         if (set != null) {
             for (String s : set) {
                 String[] parts = s.split(";");
-                if (parts.length == 3) {
-                    String name = parts[0];
-                    LocalDateTime added = LocalDateTime.parse(parts[1]); // Zmienione na LocalDateTime
-                    LocalDate expiry = LocalDate.parse(parts[2]);
-                    pantryList.add(new PantryItem(name, added, expiry));
-                }
+                if (parts.length == 3) pantryList.add(new PantryItem(parts[0], LocalDateTime.parse(parts[1]), LocalDate.parse(parts[2])));
             }
         }
     }
 
     @Override
     protected void onResume() {
-        super.onResume(); //  funkcja wznowienia
-
-        // Odświeżamy listę, aby kolory przeliczyły się względem nowej daty
-        if (adapter != null) {
-            adapter.notifyDataSetChanged();
-        }
+        super.onResume();
+        sortList();
+        SharedPreferences pref = getSharedPreferences("MojaSpiżarnia", MODE_PRIVATE);
+        ImageButton btnShowLast = findViewById(R.id.btnShowLastRecipe);
+        if (pref.getString("ostatni_przepis", null) != null) {
+            btnShowLast.setVisibility(View.VISIBLE);
+            btnShowLast.setOnClickListener(v -> {
+                Intent intent = new Intent(this, RecipeActivity.class);
+                intent.putExtra("PROMPT", "POKAZ_STARY");
+                intent.putExtra("HIDE_RETRY", true); // UKRYWAMY przycisk w podglądzie
+                startActivity(intent);
+            });
+        } else btnShowLast.setVisibility(View.GONE);
     }
 }

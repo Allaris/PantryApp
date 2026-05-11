@@ -7,7 +7,7 @@ public class PantryItem {
     private String name;
     private LocalDateTime addedDate; // LocalDateTime  data i godzina
     private LocalDate expiryDate;    // LocalDate data tylko
-
+    private boolean isSelected = false; // o checkboxów
 
     public PantryItem(String name, LocalDateTime addedDate, LocalDate expiryDate) {
         this.name = name;
@@ -27,6 +27,12 @@ public class PantryItem {
     public LocalDate getExpiryDate() {
         return expiryDate;
     }
+
+
+    //Stan checkboxów
+    public boolean isSelected() { return isSelected; }
+    public void setSelected(boolean selected) { isSelected = selected; }
+
 
     // SETTERY (edytowanie przedmiotow)
     public void setName(String name) {

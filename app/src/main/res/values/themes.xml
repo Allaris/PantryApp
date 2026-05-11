@@ -5,5 +5,12 @@
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
     </style>
 
+<!--    kalendarz-->
+    <style name="MyDatePickerSpinner" parent="android:Widget.Material.DatePicker">
+        <item name="android:datePickerMode">spinner</item>
+        <item name="android:calendarViewShown">false</item>
+    </style>
+
+
     <style name="Theme.Pantry" parent="Base.Theme.Pantry" />
 </resources>

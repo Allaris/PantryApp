@@ -8,25 +8,39 @@
     app:cardCornerRadius="8dp"
     app:cardElevation="4dp">
 
-    <LinearLayout
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="8dp">
 
-        <TextView
-            android:id="@+id/tvName"
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Nazwa produktu"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvDates"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Dodano: 01.01 | Ważne do: 10.01"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <CheckBox
+            android:id="@+id/checkboxSelect"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Nazwa produktu"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true" />
 
-        <TextView
-            android:id="@+id/tvDates"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Dodano: 01.01 | Ważne do: 10.01"
-            android:textSize="14sp" />
-    </LinearLayout>
+    </RelativeLayout>
 </androidx.cardview.widget.CardView>
